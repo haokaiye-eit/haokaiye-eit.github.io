@@ -29,8 +29,14 @@
   },
   "education": [
     {
-      "start": "2025.09",
-      "end": "2029.07（预计）",
+      "start": {
+        "zh": "2025.09",
+        "en": "2025.09"
+      },
+      "end": {
+        "zh": "2029.07（预计）",
+        "en": "2029.07 (expected)"
+      },
       "institution": {
         "zh": "宁波东方理工大学 力学与机械工程学院",
         "en": "School of Mechanics and Mechanical Engineering, Eastern Institute of Technology, Ningbo"

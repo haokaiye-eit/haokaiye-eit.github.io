@@ -136,7 +136,7 @@ def biography(lang, current):
     edu = ''
     for item in P['education']:
         advisor = f'<p>{pick(lang, "导师：", "Advisor: ")}{tr(item["advisor"], lang)}</p>' if item.get('advisor') else ''
-        edu += f'<li><span class="date">{item["start"]} – {item["end"]}</span><div><h3>{tr(item["institution"], lang)}</h3><p>{tr(item["field"], lang)} · {tr(item["degree"], lang)}</p>{advisor}</div></li>'
+        edu += f'<li><span class="date">{tr(item["start"], lang)} – {tr(item["end"], lang)}</span><div><h3>{tr(item["institution"], lang)}</h3><p>{tr(item["field"], lang)} · {tr(item["degree"], lang)}</p>{advisor}</div></li>'
     honors = heading(pick(lang, "奖励与荣誉", "Honors & awards")) + '<ol class="timeline">' + ''.join(f'<li><span class="date">{i["year"]}</span><div><h3>{tr(i["title"], lang)}</h3></div></li>' for i in P['honors']) + '</ol>' if P['honors'] else ''
     cv = cv_links(lang, current)
     actions = f'<div class="intro-actions">{cv}</div>' if cv else ''
