@@ -1,4 +1,4 @@
-"""Build Shengqi Zhang's bilingual academic website (Python 3.10+, no packages)."""
+"""Build Haokai Ye's bilingual personal website (Python 3.10+, no packages)."""
 from pathlib import Path
 from html import escape
 from urllib.parse import urlsplit, urlunsplit
@@ -70,7 +70,7 @@ def cv_links(lang, current, cls=''):
     labels = [('zh', '中文简历 ↓'), ('en', 'English CV ↓')]
     if lang == 'en':
         labels.reverse()
-    return ''.join(a(current, f'files/cv-{locale}.pdf', label, cls) for locale, label in labels)
+    return ''.join(a(current, f'files/cv-{locale}.pdf', label, cls) for locale, label in labels if (ROOT / f'files/cv-{locale}.pdf').is_file())
 
 
 def academic_links(cls=''):
@@ -121,12 +121,15 @@ def home(lang, current):
     tags = ''.join(f'<span>{tr(t, lang)}</span>' for t in P['research_interests'])
     actions = a(current, target(lang, 'research'), pick(lang, '了解研究方向 →', 'Explore my research →')) + cv_links(lang, current)
     stats = [(len(PAPERS), '学术论文', 'Publications'), (len(P['projects']), '科研项目', 'Research projects'), (len(P['patents_software']), '专利与软件著作权', 'Patents & software copyrights')]
+    stats = [item for item in stats if item[0]]
     stats_html = ''.join(f'<div><strong>{n}</strong><span>{pick(lang, zh, en)}</span></div>' for n, zh, en in stats)
     selected_ids = CONFIG['selected_publications']
     selected = ''.join(paper_html(next(p for p in PAPERS if p['id'] == id), current, lang, True) for id in selected_ids)
+    sections_html = (f'<div class="stats-line">{stats_html}</div>' if stats_html else '')
+    if selected:
+        sections_html += f'<section class="selected-section" aria-labelledby="selected-heading"><div class="section-heading"><h2 id="selected-heading">{pick(lang, "代表论文", "Selected publications")}</h2>{a(current, target(lang, "publications"), pick(lang, "全部论文 →", "All publications →"), "small-link")}</div><ol class="publications-list">{selected}</ol></section>'
     return f'''<div class="prose">{intro}</div><div class="research-tags">{tags}</div>
-    <div class="intro-actions">{actions}</div><div class="stats-line">{stats_html}</div>
-    <section class="selected-section" aria-labelledby="selected-heading"><div class="section-heading"><h2 id="selected-heading">{pick(lang, '代表论文', 'Selected publications')}</h2>{a(current, target(lang, 'publications'), pick(lang, '全部论文 →', 'All publications →'), 'small-link')}</div><ol class="publications-list">{selected}</ol></section>'''
+    <div class="intro-actions">{actions}</div>{sections_html}'''
 
 
 def biography(lang, current):
@@ -134,12 +137,16 @@ def biography(lang, current):
     for item in P['education']:
         advisor = f'<p>{pick(lang, "导师：", "Advisor: ")}{tr(item["advisor"], lang)}</p>' if item.get('advisor') else ''
         edu += f'<li><span class="date">{item["start"]} – {item["end"]}</span><div><h3>{tr(item["institution"], lang)}</h3><p>{tr(item["field"], lang)} · {tr(item["degree"], lang)}</p>{advisor}</div></li>'
-    honors = ''.join(f'<li><span class="date">{i["year"]}</span><div><h3>{tr(i["title"], lang)}</h3></div></li>' for i in P['honors'])
-    return f'<div class="prose"><p>{tr(P["biography"], lang)}</p></div><div class="intro-actions">{cv_links(lang, current)}</div>{heading(pick(lang, "教育经历", "Education"))}<ol class="timeline">{edu}</ol>{heading(pick(lang, "奖励与荣誉", "Honors & awards"))}<ol class="timeline">{honors}</ol>'
+    honors = heading(pick(lang, "奖励与荣誉", "Honors & awards")) + '<ol class="timeline">' + ''.join(f'<li><span class="date">{i["year"]}</span><div><h3>{tr(i["title"], lang)}</h3></div></li>' for i in P['honors']) + '</ol>' if P['honors'] else ''
+    cv = cv_links(lang, current)
+    actions = f'<div class="intro-actions">{cv}</div>' if cv else ''
+    return f'<div class="prose"><p>{tr(P["biography"], lang)}</p></div>{actions}{heading(pick(lang, "教育经历", "Education"))}<ol class="timeline">{edu}</ol>{honors}'
 
 
 def research(lang, current):
     topics = json.loads((ROOT / 'data/research.json').read_text(encoding='utf-8'))
+    if not topics:
+        return f'<div class="prose"><p>{pick(lang, "研究方向将随着学习进展逐步更新。", "My research interests will take shape as my studies progress; this page will be updated accordingly.")}</p></div>'
     result = f'<div class="prose"><p>{pick(lang, "从流动机理到计算方法，结合理论分析、数值模拟与数据驱动建模，研究复杂流体系统中的结构、输运和控制。", "Combining theoretical analysis, numerical simulation, and data-driven modeling to study structures, transport, and control in complex fluid systems.")}</p></div><div class="selected-section">'
     for n, topic in enumerate(topics, 1):
         related = ''.join(f'<p class="related-paper">{a(current, target(lang, "publications") + "#" + id, esc(next(p["title"] for p in PAPERS if p["id"] == id)) + " ↗")}</p>' for id in topic['papers'])
@@ -148,13 +155,17 @@ def research(lang, current):
 
 
 def publications(lang, current):
+    if not PAPERS:
+        return f'<div class="prose"><p>{pick(lang, "暂无论文发表记录，后续将在此更新。", "No publications yet; this page will be updated as work gets published.")}</p></div>'
     years = sorted({p['year'] for p in PAPERS}, reverse=True)
     notes = pick(lang, '* 表示通讯作者；姓名加粗标出本人。', '* denotes a corresponding author; my name is shown in bold.')
     fields = f'''<div class="filters"><div><label for="publication-search">{pick(lang, '检索论文', 'Search publications')}</label><input id="publication-search" type="search" placeholder="{pick(lang, '标题、作者或期刊', 'Title, author, or journal')}" autocomplete="off"></div><div><label for="publication-year">{pick(lang, '发表年份', 'Year')}</label><select id="publication-year"><option value="all">{pick(lang, '全部年份', 'All years')}</option>{''.join(f'<option value="{y}">{y}</option>' for y in years)}</select></div></div>
     <div class="filter-status"><p id="publication-count" role="status" aria-live="polite">{len(PAPERS)} {pick(lang, '篇论文', 'publications')}</p><button type="button" id="reset-filters">{pick(lang, '重置筛选', 'Reset filters')}</button></div>'''
     sections = ''.join(f'<section class="year-section" aria-labelledby="year-{y}"><h2 class="year-heading" id="year-{y}">{y}</h2><ol class="publications-list">{"".join(paper_html(p, current, lang) for p in PAPERS if p["year"] == y)}</ol></section>' for y in years)
     export_link = f'<a href="{rel(current, "files/publications.bib")}" download>{pick(lang, "下载全部引用（BibTeX）↓", "Download all citations (BibTeX) ↓")}</a>'
-    return f'<p class="publication-note">{notes}</p><div class="publication-tools">{export_link}<a href="{esc(CONFIG["profiles"][1]["url"])}">Google Scholar ↗</a></div>{fields}<p id="no-publications" hidden>{pick(lang, "未找到匹配论文，请尝试其他关键词或年份。", "No matching publications. Try a different keyword or year.")}</p>{sections}'
+    scholar = next((p for p in CONFIG['profiles'] if p['label'] == 'Google Scholar'), None)
+    scholar_link = f'<a href="{esc(scholar["url"])}">Google Scholar ↗</a>' if scholar else ''
+    return f'<p class="publication-note">{notes}</p><div class="publication-tools">{export_link}{scholar_link}</div>{fields}<p id="no-publications" hidden>{pick(lang, "未找到匹配论文，请尝试其他关键词或年份。", "No matching publications. Try a different keyword or year.")}</p>{sections}'
 
 
 def projects(lang, current):
@@ -162,20 +173,31 @@ def projects(lang, current):
     for item in sorted(P['projects'], key=lambda p: p['start'], reverse=True):
         amount = item['amount_original'] if lang == 'zh' else f'CNY {item["amount_cny"]:,}'
         result += f'<article class="record"><h3>{tr(item["title"], lang)}</h3><p>{tr(item["program"], lang)}</p><p class="record-meta">{item["start"]} – {item["end"]} · <span class="record-role">{tr(item["role"], lang)}</span> · {pick(lang, "项目经费：", "Project funding: ")}{esc(amount)}</p></article>'
-    result += heading(pick(lang, '专利与软件著作权', 'Patents & software copyrights'))
+    if P['patents_software']:
+        result += heading(pick(lang, '专利与软件著作权', 'Patents & software copyrights'))
     for item in P['patents_software']:
         result += f'<article class="record"><h3>{tr(item["title"], lang)}</h3><p>{tr(item["authors"], lang)}</p><p class="record-meta">{item["year"]} · {tr(item["type"], lang)} · {esc(item["number"])}</p></article>'
+    if not result:
+        result = f'<div class="prose"><p>{pick(lang, "暂无科研项目记录，后续将在此更新。", "No projects yet; this page will be updated as work progresses.")}</p></div>'
     return result
 
 
 def activities(lang, current):
-    result = heading(pick(lang, '邀请报告', 'Invited talks')) + '<ol class="timeline">'
-    for item in P['talks']:
-        result += f'<li><span class="date">{item["date"]}</span><div><h3>{tr(item["title"], lang)}</h3><p>{tr(item["event"], lang)} · {tr(item["location"], lang)}</p></div></li>'
-    result += '</ol>' + heading(pick(lang, '学术服务', 'Academic service'))
-    result += '<ul class="service-list">' + ''.join(f'<li>{tr(i, lang)}</li>' for i in P['service']['entries']) + '</ul>'
-    result += heading(pick(lang, '期刊审稿', 'Journal reviewing'))
-    return result + '<ul class="service-list" lang="en">' + ''.join(f'<li>{esc(i)}</li>' for i in P['service']['reviewer_journals']) + '</ul>'
+    result = ''
+    if P['talks']:
+        result += heading(pick(lang, '邀请报告', 'Invited talks')) + '<ol class="timeline">'
+        for item in P['talks']:
+            result += f'<li><span class="date">{item["date"]}</span><div><h3>{tr(item["title"], lang)}</h3><p>{tr(item["event"], lang)} · {tr(item["location"], lang)}</p></div></li>'
+        result += '</ol>'
+    if P['service']['entries']:
+        result += heading(pick(lang, '学术服务', 'Academic service'))
+        result += '<ul class="service-list">' + ''.join(f'<li>{tr(i, lang)}</li>' for i in P['service']['entries']) + '</ul>'
+    if P['service']['reviewer_journals']:
+        result += heading(pick(lang, '期刊审稿', 'Journal reviewing'))
+        result += '<ul class="service-list" lang="en">' + ''.join(f'<li>{esc(i)}</li>' for i in P['service']['reviewer_journals']) + '</ul>'
+    if not result:
+        result = f'<div class="prose"><p>{pick(lang, "暂无学术活动记录，后续将在此更新。", "No activities yet; this page will be updated as they happen.")}</p></div>'
+    return result
 
 
 def layout(lang, page, content):
@@ -192,11 +214,11 @@ def layout(lang, page, content):
         for loc in ('zh', 'en'):
             metadata += f'<link rel="alternate" hreflang="{pick(loc, "zh-CN", "en")}" href="{esc(public_url(loc, page))}">'
         metadata += f'<link rel="alternate" hreflang="x-default" href="{esc(public_url("en", page))}">'
-        metadata += f'<meta property="og:url" content="{esc(public_url(lang, page))}"><meta property="og:image" content="{esc(SITE)}/images/shengqi-zhang.jpg">'
+        metadata += f'<meta property="og:url" content="{esc(public_url(lang, page))}"><meta property="og:image" content="{esc(SITE)}/images/portrait.jpg">'
     person = {'@context': 'https://schema.org', '@type': 'Person', 'name': P['name']['en'], 'alternateName': P['name']['zh'], 'jobTitle': P['title']['en'], 'affiliation': {'@type': 'Organization', 'name': P['institution']['en']}, 'sameAs': [p['url'] for p in CONFIG['profiles']]}
     if SITE:
         person['url'] = public_url(lang)
-        person['image'] = f'{SITE}/images/shengqi-zhang.jpg'
+        person['image'] = f'{SITE}/images/portrait.jpg'
     metadata += '<script type="application/ld+json">' + json.dumps(person, ensure_ascii=False).replace('<', '\\u003c') + '</script>'
     roles = P['title'][lang].rsplit('、' if lang == 'zh' else ', ', 1)
     role = esc(roles[0]).replace('、', ' · ').replace(', ', '<br>')
@@ -208,19 +230,18 @@ def layout(lang, page, content):
 <link rel="icon" href="{rel(current, 'favicon.svg')}" type="image/svg+xml"><link rel="stylesheet" href="{rel(current, 'assets/site.css')}"><link rel="stylesheet" href="{rel(current, 'assets/custom.css')}">
 <script src="{rel(current, 'assets/site.js')}" defer></script></head><body>
 <a class="skip-link" href="#content">{pick(lang, '跳到正文', 'Skip to content')}</a>
-<header class="site-header"><a class="wordmark" href="{rel(current, target(lang))}">SHENGQI ZHANG <span lang="zh-CN">章盛祺</span></a>
+<header class="site-header"><a class="wordmark" href="{rel(current, target(lang))}">{P['name']['en'].upper()} <span lang="zh-CN">{P['name']['zh']}</span></a>
 <nav class="desktop-nav" aria-label="{pick(lang, '主导航', 'Main navigation')}">{navigation}</nav>
 <a class="language-switch" href="{rel(current, target(other, page))}" lang="{pick(other, 'zh-CN', 'en')}" hreflang="{pick(other, 'zh-CN', 'en')}" aria-label="{pick(lang, '切换本页至英文', 'Switch this page to Chinese')}">{pick(lang, 'EN', '中文')} <span aria-hidden="true">↗</span></a>
 <details class="mobile-menu"><summary aria-label="{pick(lang, '打开导航', 'Open navigation')}"><span class="menu-lines" aria-hidden="true">☰</span><span>{pick(lang, '菜单', 'Menu')}</span></summary><nav aria-label="{pick(lang, '移动端导航', 'Mobile navigation')}">{navigation}</nav></details></header>
 <div class="site-grid"><aside class="sidebar" aria-label="{pick(lang, '个人信息与联系', 'Profile and contact')}"><div class="profile-intro">
-<a class="portrait-link" href="{rel(current, target(lang, 'biography'))}"><img class="portrait" src="{rel(current, 'images/shengqi-zhang.jpg')}" alt="{pick(lang, '章盛祺肖像', 'Portrait of Shengqi Zhang')}" width="333" height="400" fetchpriority="high"></a>
-<p class="profile-kicker">{pick(lang, '流体力学 · 科学计算', 'FLUID MECHANICS · COMPUTATION')}</p><h2 class="profile-name">{tr(P['name'], lang)}</h2><p class="profile-native" lang="{pick(other, 'zh-CN', 'en')}">{tr(P['name'], other)}</p>
+<a class="portrait-link" href="{rel(current, target(lang, 'biography'))}"><img class="portrait" src="{rel(current, 'images/portrait.jpg')}" alt="{pick(lang, f'{P["name"]["zh"]}肖像', f'Portrait of {P["name"]["en"]}')}" width="333" height="400" fetchpriority="high"></a>
+<p class="profile-kicker">{pick(lang, '力学 · 机械工程', 'MECHANICS · MECHANICAL ENGINEERING')}</p><h2 class="profile-name">{tr(P['name'], lang)}</h2><p class="profile-native" lang="{pick(other, 'zh-CN', 'en')}">{tr(P['name'], other)}</p>
 <p class="profile-position">{role}</p><p class="profile-academy">{supervision}</p><a class="institution" href="https://www.eitech.edu.cn/">{tr(P['institution'], lang)}</a></div>
 <section class="contact-block"><h2>{pick(lang, '联系方式', 'Contact')}</h2><a class="email" href="mailto:{P['email']}">{P['email']}</a>
-<a class="sidebar-link" href="https://faculty.eitech.edu.cn/mech/zsq_en/main.htm">{pick(lang, '学校个人主页', 'University profile')} <span aria-hidden="true">↗</span></a>
 <div class="academic-profiles">{academic_links('sidebar-link')}</div><div class="cv-downloads">{cv_links(lang, current, 'sidebar-link')}</div></section>
-<footer class="sidebar-footer"><p>© {CONFIG['content_year']} {tr(P['name'], lang)}</p><p>{pick(lang, '湍流 · 传热 · 科学计算', 'Turbulence · Transport · Computation')}</p></footer></aside>
-<main id="content" class="main-content" tabindex="-1"><article class="paper-panel"><header class="page-heading"><p class="eyebrow">{pick(lang, '流体力学与科学计算', 'FLUID MECHANICS & SCIENTIFIC COMPUTING')}</p><h1>{title}</h1></header><div class="page-body">{content}</div></article>
+<footer class="sidebar-footer"><p>© {CONFIG['content_year']} {tr(P['name'], lang)}</p><p>{pick(lang, '力学 · 机械工程', 'Mechanics · Mechanical Engineering')}</p></footer></aside>
+<main id="content" class="main-content" tabindex="-1"><article class="paper-panel"><header class="page-heading"><p class="eyebrow">{pick(lang, '力学与机械工程学院 · 宁波东方理工大学', 'MECHANICS & MECHANICAL ENGINEERING · EIT')}</p><h1>{title}</h1></header><div class="page-body">{content}</div></article>
 <div class="bottom-line"><span>{tr(P['institution'], lang)}</span><a href="#content">{pick(lang, '返回顶部 ↑', 'Back to top ↑')}</a></div></main></div></body></html>'''
 
 
@@ -235,7 +256,7 @@ for lang in ('zh', 'en'):
     for page, renderer in [('', home), ('biography', biography), ('research', research), ('publications', publications), ('projects', projects), ('activities', activities)]:
         current = target(lang, page)
         write(current, layout(lang, page, renderer(lang, current)))
-write('404.html', f'''<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="robots" content="noindex"><title>Page not found · Shengqi Zhang</title><style>body{{font:18px/1.8 system-ui,sans-serif;background:#f4f4f4;color:#3c3b3b;margin:12vh auto;padding:24px;max-width:600px}}a{{color:#197e76}}</style></head><body><p>404 · SHENGQI ZHANG</p><h1>Page not found</h1><p><a href="{BASE}/">Return to the English homepage →</a></p><p><a href="{BASE}/zh/">中文主页 →</a></p></body></html>''')
+write('404.html', f'''<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="robots" content="noindex"><title>Page not found · {P['name']['en']}</title><style>body{{font:18px/1.8 system-ui,sans-serif;background:#f4f4f4;color:#3c3b3b;margin:12vh auto;padding:24px;max-width:600px}}a{{color:#197e76}}</style></head><body><p>404 · {P['name']['en'].upper()}</p><h1>Page not found</h1><p><a href="{BASE}/">Return to the English homepage →</a></p><p><a href="{BASE}/zh/">中文主页 →</a></p></body></html>''')
 
 
 def bibtex(paper):
@@ -258,7 +279,7 @@ def bibtex(paper):
     if paper.get('doi'):
         fields['doi'] = paper['doi']
         fields['url'] = 'https://doi.org/' + paper['doi']
-    return '@article{ShengqiZhang' + str(paper['year']) + paper['id'].replace('-', '') + ',\n' + ',\n'.join(f'  {key} = {{{bib(value)}}}' for key, value in fields.items()) + '\n}\n'
+    return '@article{HaokaiYe' + str(paper['year']) + paper['id'].replace('-', '') + ',\n' + ',\n'.join(f'  {key} = {{{bib(value)}}}' for key, value in fields.items()) + '\n}\n'
 
 
 citations_dir = ROOT / 'files/citations'
@@ -280,7 +301,7 @@ if dist.is_symlink() or dist.resolve() != ROOT.resolve() / 'dist':
 dist.mkdir(exist_ok=True)
 manifest = dist / '.build-manifest.json'
 previous_files = json.loads(manifest.read_text(encoding='utf-8')) if manifest.exists() else []
-deployed = set(GENERATED) | {'favicon.svg', '.nojekyll', 'images/shengqi-zhang.jpg'}
+deployed = set(GENERATED) | {'favicon.svg', '.nojekyll', 'images/portrait.jpg'}
 for directory in ('assets', 'files'):
     deployed.update(path.relative_to(ROOT).as_posix() for path in (ROOT / directory).rglob('*') if path.is_file())
 if SITE:
@@ -298,7 +319,7 @@ for path in GENERATED:
 for directory in ('assets', 'files'):
     shutil.copytree(ROOT / directory, dist / directory, dirs_exist_ok=True)
 (dist / 'images').mkdir(exist_ok=True)
-shutil.copy2(ROOT / 'images/shengqi-zhang.jpg', dist / 'images/shengqi-zhang.jpg')
+shutil.copy2(ROOT / 'images/portrait.jpg', dist / 'images/portrait.jpg')
 shutil.copy2(ROOT / 'favicon.svg', dist / 'favicon.svg')
 (dist / '.nojekyll').touch()
 if SITE:

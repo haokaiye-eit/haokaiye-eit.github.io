@@ -115,7 +115,7 @@ for file, parsed in pages.items():
     if not parsed.lang:
         errors.append(f'Missing lang: {file}')
     text = file.read_text(encoding='utf-8')
-    for stale in ('schen@eitech.edu.cn', 'G4cgJtgAAAAJ', '/shiyi-chen-web/', '陈十一学术主页', 'SHIYI CHEN'):
+    for stale in ('schen@eitech.edu.cn', 'G4cgJtgAAAAJ', '/shiyi-chen-web/', '陈十一学术主页', 'SHIYI CHEN', '章盛祺', 'SHENGQI ZHANG', 'szhang@eitech.edu.cn', 'shengqi-zhang'):
         if stale in text:
             # The requested new repo may itself have the old name in its configured canonical.
             if stale == '/shiyi-chen-web/' and base == '/shiyi-chen-web':
@@ -214,7 +214,7 @@ for lang in ('zh', 'en'):
         if not all(profile['url'] in parsed.links for profile in config['profiles']):
             errors.append(f'Missing academic profile link: {file}')
         for locale in ('zh', 'en'):
-            if not any(link.endswith(f'files/cv-{locale}.pdf') for link in parsed.links):
+            if (ROOT / 'files' / f'cv-{locale}.pdf').is_file() and not any(link.endswith(f'files/cv-{locale}.pdf') for link in parsed.links):
                 errors.append(f'Missing {locale} CV download: {file}')
 for paper in papers:
     bib = DIST / 'files/citations' / (paper['id'] + '.bib')
@@ -227,7 +227,7 @@ for paper in papers:
 for old in ('_astro', 'zh/people', 'zh/gallery', 'en/people', 'en/gallery'):
     if (ROOT / old).exists() or any((DIST / old).rglob('*')):
         errors.append(f'Obsolete resource remains: {old}')
-if {p.name for p in (ROOT / 'images').iterdir()} != {'shengqi-zhang.jpg'}:
+if {p.name for p in (ROOT / 'images').iterdir()} != {'portrait.jpg'}:
     errors.append('Unused images remain in the project')
 if len(list((DIST / 'assets/fonts').glob('*.woff2'))) != 5:
     errors.append('Expected five actively used font files')
